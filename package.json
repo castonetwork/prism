@@ -1,0 +1,30 @@
+{
+  "name": "unilay",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.html",
+  "scripts": {
+    "start": "parcel -p 4567 public/index.html"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "parcel": "^1.11.0"
+  },
+  "dependencies": {
+    "chance": "^1.0.18",
+    "libp2p": "0.22.0",
+    "libp2p-kad-dht": "^0.14.1",
+    "libp2p-mplex": "^0.8.4",
+    "libp2p-secio": "^0.10.1",
+    "libp2p-spdy": "^0.13.1",
+    "libp2p-websocket-star": "^0.10.0",
+    "pull-combine-latest": "^1.1.2",
+    "pull-many": "^1.0.8",
+    "pull-notify": "^0.1.1",
+    "pull-pushable": "^2.2.0",
+    "pull-stringify": "^2.0.0",
+    "pull-tap": "^1.1.1"
+  }
+}
