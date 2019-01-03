@@ -39,10 +39,10 @@ const setupNode = async ({node}) => {
             /* connect peer Connections flow to wave */
             flows[peerId] && flows[peerId].pc &&
             flows[peerId].pc.getTransceivers()
-              .forEach(tranceiver=>waves[wavePeerId].pc.addTrack(tranceiver.receiver.track));
+              .forEach(transceiver=>waves[wavePeerId].pc.addTrack(transceiver.receiver.track));
           },
           'registerWaveInfo': ({peerId}) => {
-            wavePeerId = peerId
+            wavePeerId = peerId;
             waves[wavePeerId] = {
               connectedAt: Date.now()
             };
@@ -59,7 +59,7 @@ const setupNode = async ({node}) => {
           },
           'sendTrickleCandidate': async ({candidate}) => {
             console.log('[CONTROLLER] addIceCandidate', candidate)
-            waves[wavePeerId].pc.addIceCandidate(candidate);
+            await waves[wavePeerId].pc.addIceCandidate(candidate);
           }
         };
         events[event.topic] && events[event.topic](event)
@@ -67,7 +67,7 @@ const setupNode = async ({node}) => {
     );
   })
   node.on('peer:discovery', peerInfo => {
-    const idStr = peerInfo.id.toB58String()
+    const idStr = peerInfo.id.toB58String();
     if (!flows[idStr]) {
       flows[idStr] = {
         isDiscovered: true,
@@ -147,7 +147,7 @@ const setupNode = async ({node}) => {
   })
   node.on('peer:disconnect', peerInfo => {
     console.log('[CONTROLLER] peer disconnected:', peerInfo.id.toB58String())
-    const idStr = peerInfo.id.toB58String()
+    const idStr = peerInfo.id.toB58String();
     if (idStr && flows[idStr]) {
       flows[idStr].isDialed = false;
     }
