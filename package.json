@@ -1,7 +1,7 @@
 {
-  "name": "unilay",
+  "name": "prism",
   "version": "1.0.0",
-  "description": "",
+  "description": "webRTC multiplexer",
   "main": "index.html",
   "scripts": {
     "start": "parcel -p 4567 public/index.html"
