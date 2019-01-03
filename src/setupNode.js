@@ -40,6 +40,14 @@ const setupNode = async ({node}) => {
             flows[peerId] && flows[peerId].pc &&
             flows[peerId].pc.getTransceivers()
               .forEach(transceiver=>waves[wavePeerId].pc.addTrack(transceiver.receiver.track));
+            await Promise.all([
+              waves[wavePeerId].pc.setRemoteDescription(sdp),
+              waves[wavePeerId].pc.setLocalDescription(await waves[wavePeerId].pc.createAnswer())
+            ]);
+            sendToWave.push({
+              topic: 'sendCreatedAnswer',
+              sdp: waves[wavePeerId].pc.localDescription
+            })
           },
           'registerWaveInfo': ({peerId}) => {
             wavePeerId = peerId;
