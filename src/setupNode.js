@@ -3,6 +3,7 @@ const stringify = require('pull-stringify')
 const Pushable = require('pull-pushable')
 const {tap} = require('pull-tap')
 const Many = require('pull-many')
+const Notify = require('pull-notify')
 
 const configuration = {
   iceServers: [{urls: 'stun:stun.l.google.com:19302'}],
@@ -13,9 +14,11 @@ const configuration = {
 const setupNode = async ({node}) => {
   let flows = {};
   let waves = {};
+  const broadcastToChannel = Notify();
   node.handle('/controller', (protocol, conn) => {
-    let roomOutputInfo;
+    let wavePeerId;
     const sendToWave = Pushable();
+
     pull(
       Many([sendToWave, broadcastToChannel.listen()]),
       stringify(),
@@ -25,21 +28,22 @@ const setupNode = async ({node}) => {
       pull.drain(event => {
         const events = {
           'sendCreateOffer': async ({sdp, peerId}) => {
-            const castPc = new RTCPeerConnection( configuration );
-            castPc.onicecandidate = event =>
+            waves[wavePeerId].pc = new RTCPeerConnection( configuration );
+            waves[wavePeerId].pc.onicecandidate = event =>
               event.candidate && sendToWave.push({
                 topic: "sendTrickleCandidate",
                 ice: event.candidate
               });
-            castPc.oniceconnectionstatechange = ()=> {
+            waves[wavePeerId].pc.oniceconnectionstatechange = ()=> {
             };
             /* connect peer Connections flow to wave */
             flows[peerId] && flows[peerId].pc &&
             flows[peerId].pc.getTransceivers()
-              .forEach(tranceiver=>castPc.addTrack(tranceiver.receiver.track));
+              .forEach(tranceiver=>waves[wavePeerId].pc.addTrack(tranceiver.receiver.track));
           },
           'registerWaveInfo': ({peerId}) => {
-            waves[peerId] = {
+            wavePeerId = peerId
+            waves[wavePeerId] = {
               connectedAt: Date.now()
             };
             let channels = Object.keys(flows).reduce((acc, key)=>{
@@ -55,10 +59,7 @@ const setupNode = async ({node}) => {
           },
           'sendTrickleCandidate': async ({candidate}) => {
             console.log('[CONTROLLER] addIceCandidate', candidate)
-            await addIceCandidate({
-              candidate,
-              ...roomOutputInfo,
-            })
+            waves[wavePeerId].pc.addIceCandidate(candidate);
           }
         };
         events[event.topic] && events[event.topic](event)
@@ -115,10 +116,7 @@ const setupNode = async ({node}) => {
             },
             'sendTrickleCandidate': async ({candidate}) => {
               console.log('[CONTROLLER] addIceCandidate')
-              await addIceCandidate({
-                candidate,
-                ...roomInfo,
-              })
+              flows[idStr].pc.addIceCandidate(candidate);
             },
             'updateStreamerInfo': ({profile, title=""}) => {
               console.log(`[CONTROLLER] updateStreamerInfo from ${idStr}`);
@@ -139,8 +137,7 @@ const setupNode = async ({node}) => {
               });
             },
           }
-          events[event.request] && events[event.request](event)
-          // sendJanusStream.push
+          events[event.topic] && events[event.topic](event)
         }),
       )
     })
