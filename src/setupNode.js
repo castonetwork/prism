@@ -9,7 +9,13 @@ const wsSink = require('pull-ws')
 const {sendStream, recvNotify, broadcastToChannel} = require('./pushnNotify')
 const {keepAlive, createSession, attach, createRoom, joinRoom, configure, addIceCandidate, subscribe, start} = require(
   './socketStream')
-const crypto = require('crypto')
+const crypto = require('crypto');
+
+const configuration = {
+  iceServers: [{urls: 'stun:stun.l.google.com:19302'}],
+  sdpSemantics: 'unified-plan'
+};
+
 
 const socketSingleTon = (() => {
   let socket
@@ -88,39 +94,57 @@ const getRoomOutput = async (outputEndpoint)=>{
 }
 /* setup Node */
 const setupNode = async ({node}) => {
-  let peers = {}
+  let flows = {};
+  let waves = {};
   node.handle('/controller', (protocol, conn) => {
     let roomOutputInfo;
-    const sendToChannel = Pushable()
+    const sendToWave = Pushable();
     pull(
-      Many([sendToChannel, broadcastToChannel.listen()]),
+      Many([sendToWave, broadcastToChannel.listen()]),
       stringify(),
       conn,
       pull.map(o => JSON.parse(o.toString())),
       tap(console.log),
       pull.drain(event => {
-        let streams = Object.keys(peers).reduce((acc, key)=>{
-          if(peers[key].title){
-            acc[key] = peers[key];
-          }
-          return acc;
-        },{})
         const events = {
-          'requestPeerInfo': o => {
-            sendToChannel.push({
-              type: 'sendChannelList',
-              peers : streams,
+          'sendCreateOffer': async ({sdp, peerId}) => {
+            const castPc = new RTCPeerConnection( configuration );
+            castPc.onicecandidate = event =>
+              event.candidate && sendToWave.push({
+                topic: "sendTrickleCandidate",
+                ice: event.candidate
+              });
+            castPc.oniceconnectionstatechange = ()=> {
+            };
+            /* connect peer Connections flow to wave */
+            flows[peerId] && flows[peerId].pc &&
+            flows[peerId].pc.getTransceivers()
+              .forEach(tranceiver=>castPc.addTrack(tranceiver.receiver.track));
+          },
+          'registerWaveInfo': ({peerId}) => {
+            waves[peerId] = {
+              connectedAt: Date.now()
+            };
+            let channels = Object.keys(flows).reduce((acc, key)=>{
+              if(flows[key].title){
+                acc[key] = flows[key];
+              }
+              return acc;
+            },{});
+            sendToWave.push({
+              topic: 'sendChannelsList',
+              channels
             })
           },
           'requestOfferSDP': async o => {
-            let roomInfo = peers[o.streamerId].roomInfo;
+            let roomInfo = flows[o.streamerId].roomInfo;
             let subscribeEndpoint = await getEndpoint(roomInfo)
             roomOutputInfo = await getRoomOutput({
               ...roomInfo,
               handleId: subscribeEndpoint.handleId
             });
-            sendToChannel.push({
-              type: "responseOfferSDP",
+            sendToWave.push({
+              topic: "responseOfferSDP",
               jsep: roomOutputInfo.jsep,
             })
           },
@@ -133,50 +157,61 @@ const setupNode = async ({node}) => {
           },
           'sendCreateAnswer': async ({jsep}) => {
             //getOutput Info를 가져와야함
-            //let roomInfo = peers[o.streamerId].roomInfo;
+            //let roomInfo = flows[o.streamerId].roomInfo;
             await start({...roomOutputInfo, jsep})
           }
         }
-        events[event.type] && events[event.type](event)
+        events[event.topic] && events[event.topic](event)
       }),
     );
   })
   node.on('peer:discovery', peerInfo => {
     const idStr = peerInfo.id.toB58String()
-    if (!peers[idStr]) {
-      peers[idStr] = {
+    if (!flows[idStr]) {
+      flows[idStr] = {
         isDiscovered: true,
+        discoveredAt: Date.now()
       }
     }
-    !peers[idStr].isDialed &&
+    !flows[idStr].isDialed &&
     node.dialProtocol(peerInfo, '/streamer/unified-plan', async (err, conn) => {
       if (err) {
         // console.error("Failed to dial:", err);
         return
       }
-      peers[idStr].isDialed = true
+      flows[idStr].isDialed = true
       console.log(`[STREAMER] ${idStr} is dialed`)
-      let pushStreamer = Pushable()
+      let sendToFlow = Pushable()
       // request creator information
-      pushStreamer.push({
-        type: 'requestStreamerInfo',
+      sendToFlow.push({
+        topic: 'requestStreamerInfo',
         peerId: idStr,
       })
       pull(
-        pushStreamer,
+        sendToFlow,
         stringify(),
         // tap(o => console.log('[CONTROLLER]', o)),
         conn,
         pull.map(o => JSON.parse(o.toString())),
         pull.drain(event => {
           const events = {
-            'sendCreateOffer': async ({jsep}) => {
-              // const answerSDP = await configure({jsep})
-              // console.log('[MEDIASERVER] configured:', answerSDP)
-              // pushStreamer.push({
-              //   type: 'answer',
-              //   sdp: answerSDP.sdp,
-              // })
+            'sendCreateOffer': async ({sdp}) => {
+              flows[idStr].pc = new RTCPeerConnection( configuration );
+              flows[idStr].pc.onicecandidate = event =>
+                event.candidate && sendToFlow.push({
+                  topic: "sendTrickleCandidate",
+                  ice: event.candidate
+                });
+              flows[idStr].pc.oniceconnectionstatechange = ()=> {
+              };
+              await Promise.all([
+                flows[idStr].pc.setRemoteDescription(sdp),
+                flows[idStr].pc.setLocalDescription(await flows[idStr].pc.createAnswer())
+              ]);
+              sendToFlow.push({
+                topic: 'sendCreatedAnswer',
+                sdp: flows[idStr].pc.localDescription
+              })
             },
             'sendTrickleCandidate': async ({candidate}) => {
               console.log('[CONTROLLER] addIceCandidate')
@@ -187,18 +222,18 @@ const setupNode = async ({node}) => {
             },
             'updateStreamerInfo': ({profile, title=""}) => {
               console.log(`[CONTROLLER] updateStreamerInfo from ${idStr}`);
-              peers[idStr] = {...peers[idStr], profile, title};
+              flows[idStr] = {...flows[idStr], profile, title};
               broadcastToChannel({
-                type: "updateChannelInfo",
+                topic: "updateChannelInfo",
                 peerId: idStr,
-                info: peers[idStr]
+                info: flows[idStr]
               });
             },
             'updateStreamerSnapshot': ({snapshot}) => {
               // console.log(`[CONTROLLER] updateStreamerSnapshot from ${idStr}`);
-              peers[idStr] = {...peers[idStr], snapshot};
+              flows[idStr] = {...flows[idStr], snapshot};
               broadcastToChannel({
-                type: "updateChannelSnapshot",
+                topic: "updateChannelSnapshot",
                 peerId: idStr,
                 snapshot
               });
@@ -216,7 +251,9 @@ const setupNode = async ({node}) => {
   node.on('peer:disconnect', peerInfo => {
     console.log('[CONTROLLER] peer disconnected:', peerInfo.id.toB58String())
     const idStr = peerInfo.id.toB58String()
-    idStr && peers[idStr] && delete peers[idStr]
+    if (idStr && flows[idStr]) {
+      flows[idStr].isDialed = false;
+    }
   })
   node.start(err => {
     if (err) {
