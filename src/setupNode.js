@@ -3,95 +3,12 @@ const stringify = require('pull-stringify')
 const Pushable = require('pull-pushable')
 const {tap} = require('pull-tap')
 const Many = require('pull-many')
-const Websocket = require('ws')
-const wsSource = require('pull-ws/source')
-const wsSink = require('pull-ws')
-const {sendStream, recvNotify, broadcastToChannel} = require('./pushnNotify')
-const {keepAlive, createSession, attach, createRoom, joinRoom, configure, addIceCandidate, subscribe, start} = require(
-  './socketStream')
-const crypto = require('crypto');
 
 const configuration = {
   iceServers: [{urls: 'stun:stun.l.google.com:19302'}],
   sdpSemantics: 'unified-plan'
 };
 
-
-const socketSingleTon = (() => {
-  let socket
-  let intervalIds = [];
-  return {
-    getSocket: (wsUrl, protocol) => {
-      if (!socket) {
-        socket = new Websocket(wsUrl, protocol)
-        socket.on('close', () => intervalIds.map(clearInterval));
-      }
-      return socket
-    },
-    getIntervalIds : () => intervalIds
-  }
-})()
-
-const setupJanusWebSocket = async ({wsUrl, protocol = 'janus-protocol'}) =>
-  new Promise(async (resolve, reject) => {
-    const socket = socketSingleTon.getSocket(wsUrl, protocol)
-    pull(
-      sendStream,
-      pull.map(JSON.stringify),
-      // tap(o => console.log('[SENT]', o)),
-      wsSink(socket),
-    )
-    pull(
-      wsSource(socket),
-      pull.map(o => JSON.parse(o)),
-      pull.drain(o => {
-        recvNotify(o)
-      }),
-    )
-    
-    /* mediaServer initialize Sequence */
-    const sessionId = await createSession()
-    resolve({
-      sessionId
-    })
-  })
-
-const getEndpoint = async ({sessionId}) =>{
-  const intervalIds = socketSingleTon.getIntervalIds();
-  const handleId = await attach(sessionId)
-  /* generate keepalive */
-  const timerHandler = setInterval(() => keepAlive({sessionId, handleId}),
-    30000)
-  intervalIds.push(timerHandler);
-  return {
-    sessionId,
-    /* TODO : TIME Handler clear 처리 */
-    handleId
-  }
-}
-const getRoomInput = async (endpoint)=>{
-  const { sessionId, handleId } = endpoint;
-  const roomId = await createRoom({sessionId, handleId})
-  console.log(`[CONTROLLER] roomId: ${roomId}`)
-  const joinedRoomInfo = await joinRoom({sessionId,handleId,roomId})
-  console.log('[CONTROLLER] joining room')
-  //peers[idStr].roomInfo.publisherId = joinedRoomInfo.plugindata.data.id
-  const publisherId = joinedRoomInfo.plugindata.data.id
-  return {
-    ...endpoint,
-    roomId,
-    publisherId
-  }
-}
-
-const getRoomOutput = async (outputEndpoint)=>{
-  const roomOutput = await subscribe(outputEndpoint)
-  console.log('[CONTROLLER] subscribin room');
-  return {
-    ...outputEndpoint,
-    jsep: roomOutput.jsep
-  }
-}
 /* setup Node */
 const setupNode = async ({node}) => {
   let flows = {};
@@ -136,31 +53,14 @@ const setupNode = async ({node}) => {
               channels
             })
           },
-          'requestOfferSDP': async o => {
-            let roomInfo = flows[o.streamerId].roomInfo;
-            let subscribeEndpoint = await getEndpoint(roomInfo)
-            roomOutputInfo = await getRoomOutput({
-              ...roomInfo,
-              handleId: subscribeEndpoint.handleId
-            });
-            sendToWave.push({
-              topic: "responseOfferSDP",
-              jsep: roomOutputInfo.jsep,
-            })
-          },
           'sendTrickleCandidate': async ({candidate}) => {
             console.log('[CONTROLLER] addIceCandidate', candidate)
             await addIceCandidate({
               candidate,
               ...roomOutputInfo,
             })
-          },
-          'sendCreateAnswer': async ({jsep}) => {
-            //getOutput Info를 가져와야함
-            //let roomInfo = flows[o.streamerId].roomInfo;
-            await start({...roomOutputInfo, jsep})
           }
-        }
+        };
         events[event.topic] && events[event.topic](event)
       }),
     );
@@ -263,6 +163,6 @@ const setupNode = async ({node}) => {
     console.log('>> ',
       node.peerInfo.multiaddrs.toArray().map(o => o.toString()))
   })
-}
+};
 
-module.exports = setupNode
+module.exports = setupNode;
