@@ -55,7 +55,7 @@ const setupNode = async ({node}) => {
               connectedAt: Date.now()
             };
             let channels = Object.keys(flows).reduce((acc, key)=>{
-              if(flows[key].title){
+              if(flows[key].isDialed){
                 acc[key] = flows[key];
               }
               return acc;
@@ -131,6 +131,7 @@ const setupNode = async ({node}) => {
               flows[idStr] = {...flows[idStr], profile, title};
               broadcastToChannel({
                 topic: "updateChannelInfo",
+                type: "added",
                 peerId: idStr,
                 info: flows[idStr]
               });
