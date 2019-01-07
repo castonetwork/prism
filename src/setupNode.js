@@ -10,6 +10,7 @@ const configuration = {
   sdpSemantics: 'unified-plan'
 };
 
+const DIAL_TERMINATED = "dialTerminate";
 /* setup Node */
 const setupNode = async ({node}) => {
   let flows = {};
@@ -74,20 +75,17 @@ const setupNode = async ({node}) => {
       }),
     );
   })
-  node.on('peer:discovery', peerInfo => {
-    const idStr = peerInfo.id.toB58String();
-    if (!flows[idStr]) {
-      flows[idStr] = {
-        isDiscovered: true,
-        discoveredAt: Date.now()
-      }
-    }
-    !flows[idStr].isDialed &&
+  let dialedPeerInfo;
+  const dialToFlow = peerInfo =>
     node.dialProtocol(peerInfo, '/streamer/unified-plan', async (err, conn) => {
       if (err) {
         // console.error("Failed to dial:", err);
         return
       }
+      if (dialedPeerInfo) {
+        return
+      }
+      const idStr = peerInfo.id.toB58String();
       flows[idStr].isDialed = true
       console.log(`[STREAMER] ${idStr} is dialed`)
       let sendToFlow = Pushable()
@@ -102,6 +100,7 @@ const setupNode = async ({node}) => {
         // tap(o => console.log('[CONTROLLER]', o)),
         conn,
         pull.map(o => JSON.parse(o.toString())),
+        pull.take(o => o.topic !== DIAL_TERMINATED),
         pull.drain(event => {
           const events = {
             'sendCreateOffer': async ({sdp}) => {
@@ -149,7 +148,19 @@ const setupNode = async ({node}) => {
           events[event.topic] && events[event.topic](event)
         }),
       )
+      dialedPeerInfo = peerInfo;
+
     })
+
+  node.on('peer:discovery', peerInfo => {
+    const idStr = peerInfo.id.toB58String();
+    if (!flows[idStr]) {
+      flows[idStr] = {
+        isDiscovered: true,
+        discoveredAt: Date.now()
+      }
+    }
+    !flows[idStr].isDialed && dialToFlow(peerInfo);
   })
   node.on('peer:connect', peerInfo => {
     console.log('[CONTROLLER] peer connected:', peerInfo.id.toB58String())
