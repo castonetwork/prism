@@ -173,7 +173,7 @@ const setupNode = async ({node}) => {
       )
       sendToFlow.push({
         topic: 'requestStreamerInfo',
-        peerId: idStr,
+        peerId: node.peerInfo.id.toB58String()
       })
     })
 
