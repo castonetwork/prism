@@ -35,8 +35,10 @@ const setupNode = async ({node}) => {
                 topic: "sendTrickleCandidate",
                 ice: event.candidate
               });
-            waves[wavePeerId].pc.oniceconnectionstatechange = ()=> {
+            waves[wavePeerId].pc.oniceconnectionstatechange = (e)=> {
+              console.log(`WAVE ${wavePeerId.substr(0,5)} : status : ${e.toString()}`);
             };
+            waves[wavePeerId].pc.onerror = e=>{console.log(e)};
             /* connect peer Connections flow to wave */
             flows[peerId] && flows[peerId].pc &&
             flows[peerId].pc.getTransceivers()
@@ -75,14 +77,14 @@ const setupNode = async ({node}) => {
       }),
     );
   })
-  let dialedPeerInfo;
+  let connectedFlowPeerId;
   const dialToFlow = peerInfo =>
     node.dialProtocol(peerInfo, '/streamer/unified-plan', async (err, conn) => {
       if (err) {
         // console.error("Failed to dial:", err);
         return
       }
-      if (dialedPeerInfo) {
+      if (connectedFlowPeerId) {
         return
       }
       const idStr = peerInfo.id.toB58String();
@@ -90,10 +92,7 @@ const setupNode = async ({node}) => {
       console.log(`[STREAMER] ${idStr} is dialed`)
       let sendToFlow = Pushable()
       // request creator information
-      sendToFlow.push({
-        topic: 'requestStreamerInfo',
-        peerId: idStr,
-      })
+
       pull(
         sendToFlow,
         stringify(),
@@ -144,12 +143,38 @@ const setupNode = async ({node}) => {
                 snapshot
               });
             },
+            'deniedStreamInfo': ()=>{
+              node.hangUp(peerInfo, ()=>{
+                console.log(`deniedStreamInfo : ${idStr} is denied`);
+              })
+              //TODO: pull.end
+            },
+            'setupStreamInfo': ()=>{
+              if(connectedFlowPeerId){
+                sendToFlow.push({
+                  topic: "deniedSetupStreamInfo",
+                });
+                node.hangUp(peerInfo, ()=>{
+                  console.log(`deniedStreamInfo : ${idStr} is denied`);
+                })
+                //TODO: pull.end
+              }else{
+                connectedFlowPeerId = idStr;
+                sendToFlow.push({
+                  topic: "readyToCast",
+                });
+                console.log("readyToCast ", connectedFlowPeerId);
+              }
+            }
+
           }
           events[event.topic] && events[event.topic](event)
         }),
       )
-      dialedPeerInfo = peerInfo;
-
+      sendToFlow.push({
+        topic: 'requestStreamerInfo',
+        peerId: idStr,
+      })
     })
 
   node.on('peer:discovery', peerInfo => {
