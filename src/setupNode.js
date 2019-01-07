@@ -126,9 +126,9 @@ const setupNode = async ({node}) => {
               console.log('[CONTROLLER] addIceCandidate')
               flows[idStr].pc.addIceCandidate(candidate);
             },
-            'updateStreamerInfo': ({profile, title=""}) => {
+            'updateStreamerInfo': (options) => {
               console.log(`[CONTROLLER] updateStreamerInfo from ${idStr}`);
-              flows[idStr] = {...flows[idStr], profile, title};
+              flows[idStr] = {...flows[idStr], ...options};
               broadcastToChannel({
                 topic: "updateChannelInfo",
                 type: "added",
