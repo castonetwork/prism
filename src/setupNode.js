@@ -196,6 +196,9 @@ const setupNode = async ({node}) => {
     if (idStr && flows[idStr]) {
       flows[idStr].isDialed = false;
     }
+    if (idStr === connectedFlowPeerId) {
+      connectedFlowPeerId = null;
+    }
   })
   node.start(err => {
     if (err) {
