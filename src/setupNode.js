@@ -16,6 +16,7 @@ const setupNode = async ({node}) => {
   let flows = {};
   let waves = {};
   const broadcastToChannel = Notify();
+  document.getElementById("myPeerId").textContent = `current My PeerId : ${node.peerInfo.id.toB58String()}`;
   node.handle('/controller', (protocol, conn) => {
     let wavePeerId;
     const sendToWave = Pushable();
@@ -164,6 +165,7 @@ const setupNode = async ({node}) => {
                   topic: "readyToCast",
                 });
                 console.log("readyToCast ", connectedFlowPeerId);
+                document.getElementById("currentConnectedFlowPeerId").textContent = `current Flow PeerId : ${connectedFlowPeerId}`;
               }
             }
 
@@ -195,6 +197,9 @@ const setupNode = async ({node}) => {
     const idStr = peerInfo.id.toB58String();
     if (idStr && flows[idStr]) {
       flows[idStr].isDialed = false;
+      if(connectedFlowPeerId === idStr){
+        connectedFlowPeerId = null;
+      }
     }
     if (idStr === connectedFlowPeerId) {
       connectedFlowPeerId = null;
