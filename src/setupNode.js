@@ -38,16 +38,38 @@ const setupNode = async ({node}) => {
               });
             waves[wavePeerId].pc.oniceconnectionstatechange = (e)=> {
               console.log(`WAVE ${wavePeerId.substr(0,5)} : status : ${e.toString()}`);
+              if(waves[wavePeerId].pc.iceConnectionState === "connected"){
+                // 연결된 경우 flows에서 시청자 정보를 업데이트하고,
+                (!flows[peerId].waves) && (flows[peerId].waves = {});
+                flows[peerId].waves[wavePeerId] = true;
+                // waves에서 해당 waves가 어떤 flow를 보고 있는지 업데이트 한다,
+                waves[wavePeerId].currentFlowPeerId = peerId;
+                // 이후 등록된 피어정보를 flows/waves전원에게 전파한다.
+                flows[peerId].pushable.push(flows[peerId].waves);
+                Object.keys(flows[peerId].waves).forEach(key =>{
+                  waves[key].pushable.push(flows[peerId].waves)
+                })
+              }else if(waves[wavePeerId].pc.iceConnectionState === "disconnected"){
+                // 단절된 경우 flows에서 시청자 정보를 삭제하고,
+                delete flows[waves[wavePeerId].currentFlowPeerId].waves[wavePeerId];
+                // waves에서 해당 waves가 보고 있는 정보를 삭제한다,
+                waves[wavePeerId].currentFlowPeerId = null;
+                // 이후 삭제된 피어정보를 flows/waves전원에게 전파한다.
+                flows[peerId].pushable.push(flows[peerId].waves);
+                Object.keys(flows[peerId].waves).forEach(key =>{
+                  waves[key].pushable.push(flows[peerId].waves)
+                })
+                // peer:disconnect에서도 동일하게 처리되어야 한다.
+
+              }
             };
             waves[wavePeerId].pc.onerror = e=>{console.log(e)};
             /* connect peer Connections flow to wave */
             flows[peerId] && flows[peerId].pc &&
             flows[peerId].pc.getTransceivers()
               .forEach(transceiver=>waves[wavePeerId].pc.addTrack(transceiver.receiver.track));
-            await Promise.all([
-              waves[wavePeerId].pc.setRemoteDescription(sdp),
-              waves[wavePeerId].pc.setLocalDescription(await waves[wavePeerId].pc.createAnswer())
-            ]);
+            await waves[wavePeerId].pc.setRemoteDescription(sdp);
+            await waves[wavePeerId].pc.setLocalDescription(await waves[wavePeerId].pc.createAnswer());
             sendToWave.push({
               topic: 'sendCreatedAnswer',
               sdp: waves[wavePeerId].pc.localDescription
@@ -56,7 +78,8 @@ const setupNode = async ({node}) => {
           'registerWaveInfo': ({peerId}) => {
             wavePeerId = peerId;
             waves[wavePeerId] = {
-              connectedAt: Date.now()
+              connectedAt: Date.now(),
+              pushable : sendToWave
             };
             let channels = Object.keys(flows).reduce((acc, key)=>{
               if(flows[key].isDialed){
@@ -89,11 +112,11 @@ const setupNode = async ({node}) => {
         return
       }
       const idStr = peerInfo.id.toB58String();
-      flows[idStr].isDialed = true
-      console.log(`[STREAMER] ${idStr} is dialed`)
-      let sendToFlow = Pushable()
+      flows[idStr].isDialed = true;
+      console.log(`[STREAMER] ${idStr} is dialed`);
+      let sendToFlow = Pushable();
       // request creator information
-
+      flows[idStr].pushable = sendToFlow;
       pull(
         sendToFlow,
         stringify(),
@@ -122,7 +145,7 @@ const setupNode = async ({node}) => {
               })
             },
             'sendTrickleCandidate': async ({candidate}) => {
-              console.log('[CONTROLLER] addIceCandidate')
+              console.log('[CONTROLLER] addIceCandidate');
               flows[idStr].pc.addIceCandidate(candidate);
             },
             'updateStreamerInfo': (options) => {
@@ -190,19 +213,28 @@ const setupNode = async ({node}) => {
     !flows[idStr].isDialed && dialToFlow(peerInfo);
   })
   node.on('peer:connect', peerInfo => {
-    console.log('[CONTROLLER] peer connected:', peerInfo.id.toB58String())
+    // console.log('[CONTROLLER] peer connected:', peerInfo.id.toB58String())
   })
   node.on('peer:disconnect', peerInfo => {
     console.log('[CONTROLLER] peer disconnected:', peerInfo.id.toB58String())
-    const idStr = peerInfo.id.toB58String();
-    if (idStr && flows[idStr]) {
-      flows[idStr].isDialed = false;
-      if(connectedFlowPeerId === idStr){
+    const disconnPeerId = peerInfo.id.toB58String();
+    if (disconnPeerId && flows[disconnPeerId]) {
+      flows[disconnPeerId].isDialed = false;
+      if(connectedFlowPeerId === disconnPeerId){
         connectedFlowPeerId = null;
+        document.getElementById("currentConnectedFlowPeerId").textContent = "";
       }
-    }
-    if (idStr === connectedFlowPeerId) {
-      connectedFlowPeerId = null;
+    }else if(disconnPeerId && waves[disconnPeerId]){
+      //wave가 끊어진경우
+      let flowPeerId = waves[disconnPeerId].currentFlowPeerId;
+      delete flows[waves[disconnPeerId].currentFlowPeerId].waves[disconnPeerId]
+      // waves에서 해당 waves가 보고 있는 정보를 삭제한다,
+      waves[disconnPeerId].currentFlowPeerId = null;
+      // 이후 삭제된 피어정보를 flows/waves전원에게 전파한다.
+      flows[flowPeerId].pushable.push(flows[flowPeerId].waves);
+      Object.keys(flows[flowPeerId].waves).forEach(key =>{
+        waves[key].pushable.push(flows[flowPeerId].waves)
+      });
     }
   })
   node.start(err => {
