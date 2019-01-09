@@ -12,12 +12,12 @@ const configuration = {
 
 const DIAL_TERMINATED = "dialTerminate";
 /* setup Node */
-const setupNode = async ({node}) => {
+const setupNode = async ({node, serviceId}) => {
   let flows = {};
   let waves = {};
   const broadcastToChannel = Notify();
   document.getElementById("myPeerId").textContent = `current My PeerId : ${node.peerInfo.id.toB58String()}`;
-  node.handle('/controller', (protocol, conn) => {
+  node.handle(`/controller/${serviceId}`, (protocol, conn) => {
     let wavePeerId;
     const sendToWave = Pushable();
 
@@ -103,7 +103,7 @@ const setupNode = async ({node}) => {
   })
   let connectedFlowPeerId;
   const dialToFlow = peerInfo =>
-    node.dialProtocol(peerInfo, '/streamer/unified-plan', async (err, conn) => {
+    node.dialProtocol(peerInfo, `/streamer/${serviceId}/unified-plan`, async (err, conn) => {
       if (err) {
         // console.error("Failed to dial:", err);
         return

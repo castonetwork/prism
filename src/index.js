@@ -2,6 +2,7 @@ import '@babel/polyfill'
 const createNode = require("./create-node");
 const setupNode = require("./setupNode");
 
+let serviceId;
 // initialize a controller node
 const initNode = async () => {
   console.log(">> janusInstance instantiated");
@@ -10,7 +11,8 @@ const initNode = async () => {
   console.log(">> node created");
   console.log(">> node is ready", node.peerInfo.id.toB58String());
   // setup a libp2p node
-  setupNode({ node });
+  serviceId = new URL(location.href).searchParams.get('serviceId');
+  setupNode({ node, serviceId });
 };
 
 // initialize app
