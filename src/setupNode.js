@@ -45,9 +45,15 @@ const setupNode = async ({node, serviceId}) => {
                 // waves에서 해당 waves가 어떤 flow를 보고 있는지 업데이트 한다,
                 waves[wavePeerId].currentFlowPeerId = peerId;
                 // 이후 등록된 피어정보를 flows/waves전원에게 전파한다.
-                flows[peerId].pushable.push(flows[peerId].waves);
+                flows[peerId].pushable.push({
+                  topic: "updateWaves",
+                  waves: flows[peerId].waves
+                });
                 Object.keys(flows[peerId].waves).forEach(key =>{
-                  waves[key].pushable.push(flows[peerId].waves)
+                  waves[key].pushable.push({
+                    topic: "updateWaves",
+                    waves: flows[peerId].waves
+                  })
                 })
               }else if(waves[wavePeerId].pc.iceConnectionState === "disconnected"){
                 // 단절된 경우 flows에서 시청자 정보를 삭제하고,
