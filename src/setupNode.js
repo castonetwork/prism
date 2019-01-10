@@ -37,7 +37,7 @@ const setupNode = async ({node, serviceId}) => {
                 ice: event.candidate
               });
             waves[wavePeerId].pc.oniceconnectionstatechange = (e)=> {
-              console.log(`WAVE ${wavePeerId.substr(0,5)} : status : ${e.toString()}`);
+              console.log(`WAVE ${wavePeerId.substr(0,5)} : status : ${waves[wavePeerId].pc.iceConnectionState}`);
               if(waves[wavePeerId].pc.iceConnectionState === "connected"){
                 // 연결된 경우 flows에서 시청자 정보를 업데이트하고,
                 (!flows[peerId].waves) && (flows[peerId].waves = {});
@@ -55,9 +55,15 @@ const setupNode = async ({node, serviceId}) => {
                 // waves에서 해당 waves가 보고 있는 정보를 삭제한다,
                 waves[wavePeerId].currentFlowPeerId = null;
                 // 이후 삭제된 피어정보를 flows/waves전원에게 전파한다.
-                flows[peerId].pushable.push(flows[peerId].waves);
+                flows[peerId].pushable.push({
+                  topic: "updateWaves",
+                  waves: flows[peerId].waves
+                });
                 Object.keys(flows[peerId].waves).forEach(key =>{
-                  waves[key].pushable.push(flows[peerId].waves)
+                  waves[key].pushable.push({
+                    topic: "updateWaves",
+                    waves: flows[peerId].waves
+                  })
                 })
                 // peer:disconnect에서도 동일하게 처리되어야 한다.
 
@@ -145,7 +151,7 @@ const setupNode = async ({node, serviceId}) => {
               })
             },
             'sendTrickleCandidate': async ({candidate}) => {
-              console.log('[CONTROLLER] addIceCandidate');
+              console.log('[CONTROLLER] addIceCandidate', candidate);
               flows[idStr].pc.addIceCandidate(candidate);
             },
             'updateStreamerInfo': (options) => {
@@ -231,10 +237,16 @@ const setupNode = async ({node, serviceId}) => {
       // waves에서 해당 waves가 보고 있는 정보를 삭제한다,
       waves[disconnPeerId].currentFlowPeerId = null;
       // 이후 삭제된 피어정보를 flows/waves전원에게 전파한다.
-      flows[flowPeerId].pushable.push(flows[flowPeerId].waves);
-      Object.keys(flows[flowPeerId].waves).forEach(key =>{
-        waves[key].pushable.push(flows[flowPeerId].waves)
+      flows[peerId].pushable.push({
+        topic: "updateWaves",
+        waves: flows[peerId].waves
       });
+      Object.keys(flows[peerId].waves).forEach(key =>{
+        waves[key].pushable.push({
+          topic: "updateWaves",
+          waves: flows[peerId].waves
+        })
+      })
     }
   })
   node.start(err => {
