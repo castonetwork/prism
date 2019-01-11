@@ -158,10 +158,8 @@ const setupNode = async ({node, serviceId}) => {
                 });
               flows[idStr].pc.oniceconnectionstatechange = ()=> {
               };
-              await Promise.all([
-                flows[idStr].pc.setRemoteDescription(sdp),
-                flows[idStr].pc.setLocalDescription(await flows[idStr].pc.createAnswer())
-              ]);
+              await flows[idStr].pc.setRemoteDescription(sdp);
+              await flows[idStr].pc.setLocalDescription(await flows[idStr].pc.createAnswer());
               sendToFlow.push({
                 topic: 'sendCreatedAnswer',
                 sdp: flows[idStr].pc.localDescription
