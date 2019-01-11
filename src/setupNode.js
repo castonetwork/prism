@@ -30,6 +30,13 @@ const setupNode = async ({node, serviceId}) => {
       pull.drain(event => {
         const events = {
           'sendCreateOffer': async ({sdp, peerId}) => {
+            //when pc is existed, pc must closed;
+            if(waves[wavePeerId].pc){
+              console.log("a previous Pc exists.");
+              let closedPc = waves[wavePeerId].pc;
+              closedPc.getTransceivers().forEach(transceiver => transceiver.direction = 'inactive');
+              closedPc.close();
+            }
             waves[wavePeerId].pc = new RTCPeerConnection( configuration );
             waves[wavePeerId].pc.onicecandidate = event =>
               event.candidate && sendToWave.push({
@@ -39,6 +46,7 @@ const setupNode = async ({node, serviceId}) => {
             waves[wavePeerId].pc.oniceconnectionstatechange = (e)=> {
               console.log(`WAVE ${wavePeerId.substr(0,5)} : status : ${waves[wavePeerId].pc.iceConnectionState}`);
               if(waves[wavePeerId].pc.iceConnectionState === "connected"){
+                console.log("waves pc connected ", wavePeerId);
                 // 연결된 경우 flows에서 시청자 정보를 업데이트하고,
                 (!flows[peerId].waves) && (flows[peerId].waves = {});
                 flows[peerId].waves[wavePeerId] = true;
@@ -56,6 +64,9 @@ const setupNode = async ({node, serviceId}) => {
                   })
                 })
               }else if(waves[wavePeerId].pc.iceConnectionState === "disconnected"){
+                console.log("waves pc disconnected ", wavePeerId);
+                //waves[wavePeerId].pc 에 대해서 tranceiver inactivate 처리
+                waves[wavePeerId].pc.getTransceivers().forEach(transceiver => transceiver.direction = 'inactive');
                 // 단절된 경우 flows에서 시청자 정보를 삭제하고,
                 delete flows[waves[wavePeerId].currentFlowPeerId].waves[wavePeerId];
                 // waves에서 해당 waves가 보고 있는 정보를 삭제한다,
@@ -232,14 +243,19 @@ const setupNode = async ({node, serviceId}) => {
     const disconnPeerId = peerInfo.id.toB58String();
     if (disconnPeerId && flows[disconnPeerId]) {
       flows[disconnPeerId].isDialed = false;
+      if(flows[disconnPeerId].pc && flows[disconnPeerId].pc.iceConnectionState !== "closed"){
+        flows[disconnPeerId].pc.getTransceivers().forEach(transceiver => transceiver.direction = 'inactive');
+        flows[disconnPeerId].pc.close();
+      }
       if(connectedFlowPeerId === disconnPeerId){
         connectedFlowPeerId = null;
         document.getElementById("currentConnectedFlowPeerId").textContent = "";
       }
     }else if(disconnPeerId && waves[disconnPeerId]){
       //wave가 끊어진경우
-      let flowPeerId = waves[disconnPeerId].currentFlowPeerId;
-      delete flows[waves[disconnPeerId].currentFlowPeerId].waves[disconnPeerId]
+      delete flows[waves[disconnPeerId].currentFlowPeerId].waves[disconnPeerId];
+      //waves[wavePeerId].pc 에 대해서 tranceiver inactivate 처리
+      waves[wavePeerId].pc.getTransceivers().forEach(transceiver => transceiver.direction = 'inactive');
       // waves에서 해당 waves가 보고 있는 정보를 삭제한다,
       waves[disconnPeerId].currentFlowPeerId = null;
       // 이후 삭제된 피어정보를 flows/waves전원에게 전파한다.
