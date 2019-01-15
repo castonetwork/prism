@@ -5,7 +5,6 @@ const setupNode = require("./setupNode");
 let serviceId;
 // initialize a controller node
 const initNode = async () => {
-  console.log(">> janusInstance instantiated");
   console.log(">> init controller Node");
   let node = await createNode();
   console.log(">> node created");
