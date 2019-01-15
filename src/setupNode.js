@@ -23,13 +23,17 @@ const clearPc = (peerConnection) => {
   // }
   return null;
 }
+let geoPosition;
 const setupNode = async ({node, serviceId}) => {
   let flows = {};
   let waves = {};
   const broadcastToChannel = Notify();
+  geoPosition = await new Promise((resolve, reject)=>{
+    navigator.geolocation.getCurrentPosition(resolve, reject);
+  });
   document.getElementById("myPeerId").textContent = `current My PeerId : ${node.peerInfo.id.toB58String()}`;
 
-  const getPrismInfoForMonitoring = async () => {
+  const getPrismInfoForMonitoring = () => {
     let processedFlows = Object.keys(flows).reduce((acc, key) => {
       acc[key] = {
         waves: flows[key].waves,
@@ -43,13 +47,10 @@ const setupNode = async ({node, serviceId}) => {
       };
       return acc;
     }, {});
-    let geoPosition = await new Promise((resolve, reject)=>{
-      navigator.geolocation.getCurrentPosition(resolve, reject);
-    });
     return {
       flows: processedFlows,
       waves: processedWaves,
-      geoInfo: {
+      coords: {
         latitude: geoPosition.coords.latitude,
         longitude: geoPosition.coords.longitude
       }
