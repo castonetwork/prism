@@ -28,6 +28,65 @@ const setupNode = async ({node, serviceId}) => {
   let waves = {};
   const broadcastToChannel = Notify();
   document.getElementById("myPeerId").textContent = `current My PeerId : ${node.peerInfo.id.toB58String()}`;
+
+  const getPrismInfoForMonitoring = async () => {
+    let processedFlows = Object.keys(flows).reduce((acc, key) => {
+      acc[key] = {
+        waves: flows[key].waves,
+        geoInfo: flows[key].geoInfo
+      };
+      return acc;
+    }, {});
+    let processedWaves = Object.keys(waves).reduce((acc, key) => {
+      acc[key] = {
+        geoInfo: waves[key].geoInfo
+      };
+      return acc;
+    }, {});
+    let geoPosition = await new Promise((resolve, reject)=>{
+      navigator.geolocation.getCurrentPosition(resolve, reject);
+    });
+    return {
+      flows: processedFlows,
+      waves: processedWaves,
+      geoInfo: {
+        latitude: geoPosition.coords.latitude,
+        longitude: geoPosition.coords.longitude
+      }
+    }
+  };
+
+  node.handle(`/prism/${serviceId}/info`, (protocol, conn) => {
+    const sendToMonitor = Pushable();
+    pull(
+      sendToMonitor,
+      stringify(),
+      conn,
+      pull.map(o => JSON.parse(o.toString())),
+      tap(console.log),
+      pull.drain( event => {
+        const events = {
+          "prismInfo": async o => {
+            sendToMonitor({
+              topic: "prismInfo",
+              data: await getPrismInfoForMonitoring()
+            })
+          }
+        };
+        if (events[event.topic]) return events[event.topic](event);
+        else {
+          return new Promise((resolve, reject) => {
+            reject("No processEvent", event.topic);
+          });
+        }
+      })
+    );
+    sendToMonitor({
+      topic: "prismInfo",
+      data: getPrismInfoForMonitoring()
+    });
+
+  });
   node.handle(`/controller/${serviceId}`, (protocol, conn) => {
     let wavePeerId;
     const sendToWave = Pushable();
@@ -111,11 +170,12 @@ const setupNode = async ({node, serviceId}) => {
             });
             waves[wavePeerId].pc  = newPeerConnection;
           },
-          'registerWaveInfo': ({peerId}) => {
+          'registerWaveInfo': ({peerId, geoInfo}) => {
             wavePeerId = peerId;
             waves[wavePeerId] = {
               connectedAt: Date.now(),
-              pushable : sendToWave
+              pushable : sendToWave,
+              geoInfo
             };
             let channels = Object.keys(flows).reduce((acc, key)=>{
               if(flows[key].isDialed){
@@ -133,7 +193,13 @@ const setupNode = async ({node, serviceId}) => {
             await waves[wavePeerId].pc.addIceCandidate(candidate);
           }
         };
-        events[event.topic] && events[event.topic](event)
+        if (events[event.topic]) return events[event.topic](event);
+        else {
+          return new Promise((resolve, reject) => {
+            reject("No processEvent", event.topic);
+          });
+        }
+
       }),
     );
   })
@@ -184,7 +250,7 @@ const setupNode = async ({node, serviceId}) => {
             },
             'updateStreamerInfo': (options) => {
               console.log(`[CONTROLLER] updateStreamerInfo from ${idStr}`);
-              flows[idStr] = {...flows[idStr], ...options};
+              flows[idStr] = {...flows[idStr], ...options };
               broadcastToChannel({
                 topic: "updateChannelInfo",
                 type: "added",
@@ -227,7 +293,13 @@ const setupNode = async ({node, serviceId}) => {
             }
 
           }
-          events[event.topic] && events[event.topic](event)
+          if (events[event.topic]) return events[event.topic](event);
+          else {
+            return new Promise((resolve, reject) => {
+              reject("No processEvent", event.topic);
+            });
+          }
+
         }),
       )
       sendToFlow.push({
