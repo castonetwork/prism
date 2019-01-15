@@ -81,7 +81,7 @@ const setupNode = async ({node, serviceId}) => {
         }
       })
     );
-    sendToMonitor({
+    sendToMonitor.push({
       topic: "prismInfo",
       data: getPrismInfoForMonitoring()
     });
