@@ -12,6 +12,17 @@ const configuration = {
 
 const DIAL_TERMINATED = "dialTerminate";
 /* setup Node */
+
+const clearPc = (peerConnection) => {
+  peerConnection && peerConnection.close();
+  // if(peerConnection){
+  //   //peerConnection.getTransceivers().forEach(transceiver => transceiver.direction = 'inactive');
+  //  // && peerConnection.iceConnectionState !== "closed"
+  //
+  //   peerConnection = null;
+  // }
+  return null;
+}
 const setupNode = async ({node, serviceId}) => {
   let flows = {};
   let waves = {};
@@ -34,18 +45,18 @@ const setupNode = async ({node, serviceId}) => {
             if(waves[wavePeerId].pc){
               console.log("a previous Pc exists.");
               let closedPc = waves[wavePeerId].pc;
-              closedPc.getTransceivers().forEach(transceiver => transceiver.direction = 'inactive');
-              closedPc.close();
+              clearPc(closedPc);
             }
-            waves[wavePeerId].pc = new RTCPeerConnection( configuration );
-            waves[wavePeerId].pc.onicecandidate = event =>
+            const newPeerConnection = new RTCPeerConnection( configuration );
+
+            newPeerConnection.onicecandidate = event =>
               event.candidate && sendToWave.push({
                 topic: "sendTrickleCandidate",
                 ice: event.candidate
               });
-            waves[wavePeerId].pc.oniceconnectionstatechange = (e)=> {
-              console.log(`WAVE ${wavePeerId.substr(0,5)} : status : ${waves[wavePeerId].pc.iceConnectionState}`);
-              if(waves[wavePeerId].pc.iceConnectionState === "connected"){
+            newPeerConnection.oniceconnectionstatechange = (e)=> {
+              console.log(`WAVE ${wavePeerId.substr(0,5)} : status : ${newPeerConnection.iceConnectionState}`);
+              if(newPeerConnection.iceConnectionState === "connected"){
                 console.log("waves pc connected ", wavePeerId);
                 // 연결된 경우 flows에서 시청자 정보를 업데이트하고,
                 (!flows[peerId].waves) && (flows[peerId].waves = {});
@@ -63,10 +74,11 @@ const setupNode = async ({node, serviceId}) => {
                     waves: flows[peerId].waves
                   })
                 })
-              }else if(waves[wavePeerId].pc.iceConnectionState === "disconnected"){
+              }else if(newPeerConnection.iceConnectionState === "disconnected"){
                 console.log("waves pc disconnected ", wavePeerId);
-                //waves[wavePeerId].pc 에 대해서 tranceiver inactivate 처리
-                waves[wavePeerId].pc.getTransceivers().forEach(transceiver => transceiver.direction = 'inactive');
+                //newPeerConnection 에 대해서 tranceiver inactivate 처리
+                clearPc(newPeerConnection);
+                // waves[wavePeerId].pc = null;
                 // 단절된 경우 flows에서 시청자 정보를 삭제하고,
                 delete flows[waves[wavePeerId].currentFlowPeerId].waves[wavePeerId];
                 // waves에서 해당 waves가 보고 있는 정보를 삭제한다,
@@ -86,17 +98,18 @@ const setupNode = async ({node, serviceId}) => {
 
               }
             };
-            waves[wavePeerId].pc.onerror = e=>{console.log(e)};
+            newPeerConnection.onerror = e=>{console.log(e)};
             /* connect peer Connections flow to wave */
             flows[peerId] && flows[peerId].pc &&
             flows[peerId].pc.getTransceivers()
-              .forEach(transceiver=>waves[wavePeerId].pc.addTrack(transceiver.receiver.track));
-            await waves[wavePeerId].pc.setRemoteDescription(sdp);
-            await waves[wavePeerId].pc.setLocalDescription(await waves[wavePeerId].pc.createAnswer());
+              .forEach(transceiver=>newPeerConnection.addTrack(transceiver.receiver.track));
+            await newPeerConnection.setRemoteDescription(sdp);
+            await newPeerConnection.setLocalDescription(await newPeerConnection.createAnswer());
             sendToWave.push({
               topic: 'sendCreatedAnswer',
-              sdp: waves[wavePeerId].pc.localDescription
-            })
+              sdp: newPeerConnection.localDescription
+            });
+            waves[wavePeerId].pc  = newPeerConnection;
           },
           'registerWaveInfo': ({peerId}) => {
             wavePeerId = peerId;
@@ -253,7 +266,8 @@ const setupNode = async ({node, serviceId}) => {
       //wave가 끊어진경우
       delete flows[waves[disconnPeerId].currentFlowPeerId].waves[disconnPeerId];
       //waves[wavePeerId].pc 에 대해서 tranceiver inactivate 처리
-      waves[wavePeerId].pc.getTransceivers().forEach(transceiver => transceiver.direction = 'inactive');
+      //waves[wavePeerId].pc.getTransceivers().forEach(transceiver => transceiver.direction = 'inactive');
+      waves[wavePeerId].pc.close();
       // waves에서 해당 waves가 보고 있는 정보를 삭제한다,
       waves[disconnPeerId].currentFlowPeerId = null;
       // 이후 삭제된 피어정보를 flows/waves전원에게 전파한다.
