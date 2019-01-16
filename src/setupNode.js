@@ -28,22 +28,26 @@ const setupNode = async ({node, serviceId}) => {
   let flows = {};
   let waves = {};
   const broadcastToChannel = Notify();
+  try{
   geoPosition = await new Promise((resolve, reject)=>{
     navigator.geolocation.getCurrentPosition(resolve, reject);
   });
+  }catch(e){
+    console.error
+  }
   document.getElementById("myPeerId").textContent = `current My PeerId : ${node.peerInfo.id.toB58String()}`;
 
   const getPrismInfoForMonitoring = () => {
     let processedFlows = Object.keys(flows).reduce((acc, key) => {
       acc[key] = {
         waves: flows[key].waves,
-        geoInfo: flows[key].geoInfo
+        coords: flows[key].coords
       };
       return acc;
     }, {});
     let processedWaves = Object.keys(waves).reduce((acc, key) => {
       acc[key] = {
-        geoInfo: waves[key].geoInfo
+        coords: waves[key].coords
       };
       return acc;
     }, {});
@@ -171,12 +175,12 @@ const setupNode = async ({node, serviceId}) => {
             });
             waves[wavePeerId].pc  = newPeerConnection;
           },
-          'registerWaveInfo': ({peerId, geoInfo}) => {
+          'registerWaveInfo': ({peerId, coords}) => {
             wavePeerId = peerId;
             waves[wavePeerId] = {
               connectedAt: Date.now(),
               pushable : sendToWave,
-              geoInfo
+              coords: coords
             };
             let channels = Object.keys(flows).reduce((acc, key)=>{
               if(flows[key].isDialed){
