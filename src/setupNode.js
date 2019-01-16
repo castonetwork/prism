@@ -23,7 +23,7 @@ const clearPc = (peerConnection) => {
   // }
   return null;
 }
-let geoPosition;
+let geoPosition = {};
 const setupNode = async ({node, serviceId}) => {
   let flows = {};
   let waves = {};
@@ -33,7 +33,7 @@ const setupNode = async ({node, serviceId}) => {
     navigator.geolocation.getCurrentPosition(resolve, reject);
   });
   }catch(e){
-    console.error
+    console.error(e)
   }
   document.getElementById("myPeerId").textContent = `current My PeerId : ${node.peerInfo.id.toB58String()}`;
 
@@ -45,19 +45,23 @@ const setupNode = async ({node, serviceId}) => {
       };
       return acc;
     }, {});
+
     let processedWaves = Object.keys(waves).reduce((acc, key) => {
       acc[key] = {
         coords: waves[key].coords
       };
       return acc;
     }, {});
+
+    let processedCoords = geoPosition.coords ? {
+      latitude: geoPosition.coords.latitude,
+      longitude: geoPosition.coords.longitude
+    } : undefined;
+
     return {
       flows: processedFlows,
       waves: processedWaves,
-      coords: {
-        latitude: geoPosition.coords.latitude,
-        longitude: geoPosition.coords.longitude
-      }
+      coords: processedCoords
     }
   };
 
