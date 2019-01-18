@@ -6,9 +6,12 @@ const Many = require('pull-many')
 const Notify = require('pull-notify')
 
 const configuration = {
-  iceServers: [{urls: 'stun:stun.l.google.com:19302'}],
+  iceServers: [{urls: 'stun:stun.l.google.com:19302'}
+  ,{urls:'turn:turn.casto.network:3789', "username":"casto","credential":"casto2019"}
+  ],
   sdpSemantics: 'unified-plan'
 };
+//
 
 const DIAL_TERMINATED = "dialTerminate";
 /* setup Node */
