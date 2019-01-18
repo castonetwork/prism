@@ -4,7 +4,8 @@
   "description": "webRTC multiplexer",
   "main": "index.html",
   "scripts": {
-    "start": "parcel -p 4567 public/index.html"
+    "start": "parcel -p 4567 public/index.html",
+    "build": "parcel build --no-source-maps ./public/index.html --public-url ./"
   },
   "keywords": [],
   "author": "",
