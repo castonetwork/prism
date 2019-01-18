@@ -108,8 +108,7 @@ const setupNode = async ({node, serviceId}) => {
       tap(console.log),
       pull.drain(event => {
         const events = {
-          'sendCreateOffer': async ({sdp, peerId}) => {
-            //when pc is existed, pc must closed;
+          'requestCreateOffer':async ({peerId})=>{
             if(waves[wavePeerId].pc){
               console.log("a previous Pc exists.");
               let closedPc = waves[wavePeerId].pc;
@@ -171,13 +170,17 @@ const setupNode = async ({node, serviceId}) => {
             flows[peerId] && flows[peerId].pc &&
             flows[peerId].pc.getTransceivers()
               .forEach(transceiver=>newPeerConnection.addTrack(transceiver.receiver.track));
-            await newPeerConnection.setRemoteDescription(sdp);
-            await newPeerConnection.setLocalDescription(await newPeerConnection.createAnswer());
+
+            await newPeerConnection.setLocalDescription(await newPeerConnection.createOffer());
             sendToWave.push({
-              topic: 'sendCreatedAnswer',
-              sdp: newPeerConnection.localDescription
+              topic: 'sendCreatedOffer',
+              sdp: newPeerConnection.localDescription,
+              peerId
             });
             waves[wavePeerId].pc  = newPeerConnection;
+          },
+          'sendCreatedAnswer': async ({sdp, peerId})=>{
+            await waves[wavePeerId].pc.setRemoteDescription(sdp);
           },
           'registerWaveInfo': ({peerId, coords}) => {
             wavePeerId = peerId;
@@ -237,7 +240,7 @@ const setupNode = async ({node, serviceId}) => {
         pull.take(o => o.topic !== DIAL_TERMINATED),
         pull.drain(event => {
           const events = {
-            'sendCreateOffer': async ({sdp}) => {
+            'sendCreatedOffer': async ({sdp}) => {
               flows[idStr].pc = new RTCPeerConnection( configuration );
               flows[idStr].pc.onicecandidate = event =>
                 event.candidate && sendToFlow.push({
