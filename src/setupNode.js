@@ -6,12 +6,11 @@ const Many = require('pull-many')
 const Notify = require('pull-notify')
 
 const configuration = {
-  iceServers: [{urls: 'stun:stun.l.google.com:19302'}
-  ,{urls:'turn:turn.casto.network:3789', "username":"casto","credential":"casto2019"}
-  ],
+  iceServers: [{urls: 'stun:stun.l.google.com:19302'}],
   sdpSemantics: 'unified-plan'
 };
-//
+
+configuration.iceServers.push({urls:'turn:turn.casto.network:3478', "username":"casto","credential":"casto2019"})
 
 const DIAL_TERMINATED = "dialTerminate";
 /* setup Node */
@@ -165,7 +164,6 @@ const setupNode = async ({node, serviceId}) => {
                   })
                 })
                 // peer:disconnect에서도 동일하게 처리되어야 한다.
-
               }
             };
             newPeerConnection.onerror = e=>{console.log(e)};
@@ -310,6 +308,7 @@ const setupNode = async ({node, serviceId}) => {
           }
           if (events[event.topic]) return events[event.topic](event);
           else {
+            console.log(event);
             return new Promise((resolve, reject) => {
               reject("No processEvent", event.topic);
             });
