@@ -26,18 +26,16 @@ const clearPc = (peerConnection) => {
   return null;
 }
 let geoPosition = {};
-const setupNode = async ({node, serviceId}) => {
+const setupNode = async ({node, serviceId, coords}) => {
   let flows = {};
   let waves = {};
   const broadcastToChannel = Notify();
-  try{
-  geoPosition = await new Promise((resolve, reject)=>{
-    navigator.geolocation.getCurrentPosition(resolve, reject);
-  });
-  }catch(e){
-    console.error(e)
-  }
+  const broadcastToMonitor = Notify();
   document.getElementById("myPeerId").textContent = `current My PeerId : ${node.peerInfo.id.toB58String()}`;
+
+  if(coords && coords.latitude && coords.longitude){
+    geoPosition.coords = coords
+  }
 
   const getPrismInfoForMonitoring = () => {
     let processedFlows = Object.keys(flows).reduce((acc, key) => {
@@ -70,19 +68,14 @@ const setupNode = async ({node, serviceId}) => {
   node.handle(`/prism/${serviceId}/info`, (protocol, conn) => {
     const sendToMonitor = Pushable();
     pull(
-      sendToMonitor,
+      Many([sendToMonitor,broadcastToMonitor.listen()]),
       stringify(),
       conn,
       pull.map(o => JSON.parse(o.toString())),
       tap(console.log),
       pull.drain( event => {
         const events = {
-          "prismInfo": async o => {
-            sendToMonitor({
-              topic: "prismInfo",
-              data: await getPrismInfoForMonitoring()
-            })
-          }
+
         };
         if (events[event.topic]) return events[event.topic](event);
         else {
@@ -93,7 +86,7 @@ const setupNode = async ({node, serviceId}) => {
       })
     );
     sendToMonitor.push({
-      topic: "prismInfo",
+      topic: "initPrismInfo",
       data: getPrismInfoForMonitoring()
     });
 
