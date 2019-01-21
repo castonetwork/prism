@@ -33,7 +33,7 @@ const setupNode = async ({node, serviceId, coords}) => {
   const broadcastToMonitor = Notify();
   document.getElementById("myPeerId").textContent = `current My PeerId : ${node.peerInfo.id.toB58String()}`;
 
-  if(coords && coords.latitude && coords.longitude){
+  if(coords && coords.latitude !== undefined && coords.longitude !== undefined){
     geoPosition.coords = coords
   }
 
@@ -136,6 +136,11 @@ const setupNode = async ({node, serviceId, coords}) => {
                     waves: flows[peerId].waves
                   })
                 })
+                broadcastToMonitor({
+                  topic: 'addRoute',
+                  fromId: node.peerInfo.id.toB58String(),
+                  toId: wavePeerId
+                });
               }else if(newPeerConnection.iceConnectionState === "disconnected"){
                 console.log("waves pc disconnected ", wavePeerId);
                 //newPeerConnection 에 대해서 tranceiver inactivate 처리
@@ -149,6 +154,11 @@ const setupNode = async ({node, serviceId, coords}) => {
                 flows[peerId].pushable.push({
                   topic: "updateWaves",
                   waves: flows[peerId].waves
+                });
+                // 아마 타이밍 이슈가 있을 수 있음.
+                broadcastToMonitor({
+                  topic: 'removeRoute',
+                  peerId: wavePeerId
                 });
                 Object.keys(flows[peerId].waves).forEach(key =>{
                   waves[key].pushable.push({
@@ -193,6 +203,13 @@ const setupNode = async ({node, serviceId, coords}) => {
               topic: 'sendChannelsList',
               channels
             })
+            if(coords && coords.latitude !== undefined && coords.longitude !== undefined){
+              broadcastToMonitor({
+                topic: 'addPeerMarker',
+                peerId: wavePeerId,
+                coords
+              });
+            }
           },
           'sendTrickleCandidate': async ({candidate}) => {
             console.log('[CONTROLLER] addIceCandidate', candidate)
@@ -242,6 +259,13 @@ const setupNode = async ({node, serviceId, coords}) => {
                   ice: event.candidate
                 });
               flows[idStr].pc.oniceconnectionstatechange = ()=> {
+                if(flows[idStr].pc.iceConnectionState === "connected") {
+                  broadcastToMonitor({
+                    topic: 'addRoute',
+                    fromId: idStr,
+                    toId: node.peerInfo.id.toB58String()
+                  });
+                }
               };
               await flows[idStr].pc.setRemoteDescription(sdp);
               await flows[idStr].pc.setLocalDescription(await flows[idStr].pc.createAnswer());
@@ -279,7 +303,7 @@ const setupNode = async ({node, serviceId, coords}) => {
               })
               //TODO: pull.end
             },
-            'setupStreamInfo': ()=>{
+            'setupStreamInfo': ({coords})=>{
               if(connectedFlowPeerId){
                 sendToFlow.push({
                   topic: "deniedSetupStreamInfo",
@@ -293,6 +317,14 @@ const setupNode = async ({node, serviceId, coords}) => {
                 sendToFlow.push({
                   topic: "readyToCast",
                 });
+                flows[idStr].coords = coords;
+                if(coords && coords.latitude !== undefined && coords.longitude !== undefined){
+                  broadcastToMonitor({
+                    topic: 'addPeerMarker',
+                    peerId: idStr,
+                    coords
+                  });
+                }
                 console.log("readyToCast ", connectedFlowPeerId);
                 document.getElementById("currentConnectedFlowPeerId").textContent = `current Flow PeerId : ${connectedFlowPeerId}`;
               }
