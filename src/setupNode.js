@@ -207,6 +207,7 @@ const setupNode = async ({node, serviceId, coords}) => {
               broadcastToMonitor({
                 topic: 'addPeerMarker',
                 peerId: wavePeerId,
+                type: "w",
                 coords
               });
             }
@@ -322,6 +323,7 @@ const setupNode = async ({node, serviceId, coords}) => {
                   broadcastToMonitor({
                     topic: 'addPeerMarker',
                     peerId: idStr,
+                    type: "f",
                     coords
                   });
                 }
