@@ -196,7 +196,7 @@ const setupNode = async ({node, serviceId, coords}) => {
             /* connect peer Connections flow to wave */
             flows[peerId] && flows[peerId].pc &&
             flows[peerId].pc.getTransceivers()
-              .forEach(transceiver=>newPeerConnection.addTrack(transceiver.receiver.track));
+              .forEach(transceiver=>{ newPeerConnection.addTransceiver(transceiver.receiver.track.kind).sender.replaceTrack(transceiver.receiver.track); });
 
             await newPeerConnection.setLocalDescription(await newPeerConnection.createOffer());
             sendToWave.push({
