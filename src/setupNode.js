@@ -5,6 +5,29 @@ const {tap} = require('pull-tap')
 const Many = require('pull-many')
 const Notify = require('pull-notify')
 
+const startUpTime = Date.now();
+let currentFlowAssignedTime, releasedTime;
+let timerVal = 15;
+let interval = setInterval(()=>{
+  let currentTime = Date.now();
+  if ((releasedTime && releasedTime < (currentTime - 1000 * 60 * timerVal)) ||
+      (!currentFlowAssignedTime && !releasedTime && startUpTime < (currentTime - 1000 * 60 * timerVal)))
+  {
+    window.location.reload();
+  }
+}, 60 * 1000);
+
+setInterval(()=>{
+  let currentTime = Date.now();
+  document.getElementById('timeDisplay').innerHTML =`
+    currentTime : ${new Date(currentTime).toISOString()}<br/>
+    startUpTime : ${new Date(startUpTime).toISOString()}<br/>
+    flowAssignedTime : ${currentFlowAssignedTime ? new Date(currentFlowAssignedTime).toISOString() : "noTime"}<br/>
+    releasedTime : ${releasedTime ? new Date(releasedTime).toISOString() : "noTime"}
+  `;
+}, 5 * 1000);
+
+
 const configuration = {
   iceServers: [{urls: 'stun:stun.l.google.com:19302'}],
   sdpSemantics: 'unified-plan'
@@ -266,6 +289,8 @@ const setupNode = async ({node, serviceId, coords}) => {
                     fromId: idStr,
                     toId: node.peerInfo.id.toB58String()
                   });
+                }else if(flows[idStr].pc.iceConnectionState === "closed"){
+                  window.location.reload();
                 }
               };
               await flows[idStr].pc.setRemoteDescription(sdp);
@@ -315,6 +340,8 @@ const setupNode = async ({node, serviceId, coords}) => {
                 //TODO: pull.end
               }else{
                 connectedFlowPeerId = idStr;
+                currentFlowAssignedTime = Date.now();
+                releasedTime = undefined;
                 sendToFlow.push({
                   topic: "readyToCast",
                 });
@@ -363,7 +390,7 @@ const setupNode = async ({node, serviceId, coords}) => {
     // console.log('[CONTROLLER] peer connected:', peerInfo.id.toB58String())
   })
   node.on('peer:disconnect', peerInfo => {
-    console.log('[CONTROLLER] peer disconnected:', peerInfo.id.toB58String())
+    console.log('[CONTROLLER] peer disconnected:', peerInfo.id.toB58String());
     const disconnPeerId = peerInfo.id.toB58String();
     if (disconnPeerId && flows[disconnPeerId]) {
       flows[disconnPeerId].isDialed = false;
@@ -373,6 +400,8 @@ const setupNode = async ({node, serviceId, coords}) => {
       }
       if(connectedFlowPeerId === disconnPeerId){
         connectedFlowPeerId = null;
+        currentFlowAssignedTime = undefined;
+        releasedTime = Date.now();
         document.getElementById("currentConnectedFlowPeerId").textContent = "";
       }
     }else if(disconnPeerId && waves[disconnPeerId]){
