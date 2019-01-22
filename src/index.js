@@ -1,4 +1,6 @@
-import '@babel/polyfill'
+//const babel =  '@babel/polyfill'
+const isBrowser = typeof window !== 'undefined';
+isBrowser && require('@babel/polyfill');
 const createNode = require("./create-node");
 const setupNode = require("./setupNode");
 
@@ -12,9 +14,9 @@ const initNode = async () => {
   console.log(">> node created");
   console.log(">> node is ready", node.peerInfo.id.toB58String());
   // setup a libp2p node
-  serviceId = new URL(location.href).searchParams.get('serviceId');
-  longitude = parseFloat(new URL(location.href).searchParams.get('lng'));
-  latitude = parseFloat(new URL(location.href).searchParams.get('lat'));
+  serviceId = isBrowser ? new URL(location.href).searchParams.get('serviceId') : process.argv[2];
+  longitude = parseFloat(isBrowser ? new URL(location.href).searchParams.get('lng') : process.argv[3]);
+  latitude = parseFloat(isBrowser ? new URL(location.href).searchParams.get('lat') : process.argv[3]);
 
   let coords = !isNaN(latitude) && !isNaN(longitude) && {longitude, latitude} || undefined;
   setupNode({ node, serviceId, coords});

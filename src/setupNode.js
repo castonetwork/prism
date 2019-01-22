@@ -1,9 +1,12 @@
+const isBrowser = typeof window !== 'undefined';
+
 const pull = require('pull-stream')
 const stringify = require('pull-stringify')
 const Pushable = require('pull-pushable')
 const {tap} = require('pull-tap')
 const Many = require('pull-many')
 const Notify = require('pull-notify')
+const RTCPeerConnection = isBrowser ? window.RTCPeerConnection : require("wrtc").RTCPeerConnection;
 
 const startUpTime = Date.now();
 let currentFlowAssignedTime, releasedTime;
@@ -13,20 +16,21 @@ let interval = setInterval(()=>{
   if ((releasedTime && releasedTime < (currentTime - 1000 * 60 * timerVal)) ||
       (!currentFlowAssignedTime && !releasedTime && startUpTime < (currentTime - 1000 * 60 * timerVal)))
   {
-    window.location.reload();
+    isBrowser ? window.location.reload() : process.exit(1);
   }
 }, 60 * 1000);
 
-setInterval(()=>{
+if(isBrowser){
+  setInterval(()=>{
   let currentTime = Date.now();
-  document.getElementById('timeDisplay').innerHTML =`
-    currentTime : ${new Date(currentTime).toISOString()}<br/>
-    startUpTime : ${new Date(startUpTime).toISOString()}<br/>
-    flowAssignedTime : ${currentFlowAssignedTime ? new Date(currentFlowAssignedTime).toISOString() : "noTime"}<br/>
-    releasedTime : ${releasedTime ? new Date(releasedTime).toISOString() : "noTime"}
-  `;
-}, 5 * 1000);
-
+    document.getElementById('timeDisplay').innerHTML =`
+      currentTime : ${new Date(currentTime).toISOString()}<br/>
+      startUpTime : ${new Date(startUpTime).toISOString()}<br/>
+      flowAssignedTime : ${currentFlowAssignedTime ? new Date(currentFlowAssignedTime).toISOString() : "noTime"}<br/>
+      releasedTime : ${releasedTime ? new Date(releasedTime).toISOString() : "noTime"}
+    `;
+  }, 5 * 1000);
+}
 
 const configuration = {
   iceServers: [{urls: 'stun:stun.l.google.com:19302'}],
@@ -54,7 +58,8 @@ const setupNode = async ({node, serviceId, coords}) => {
   let waves = {};
   const broadcastToChannel = Notify();
   const broadcastToMonitor = Notify();
-  document.getElementById("myPeerId").textContent = `current My PeerId : ${node.peerInfo.id.toB58String()}`;
+  if(isBrowser)
+    document.getElementById("myPeerId").textContent = `current My PeerId : ${node.peerInfo.id.toB58String()}`;
 
   if(coords && coords.latitude !== undefined && coords.longitude !== undefined){
     geoPosition.coords = coords
@@ -144,7 +149,7 @@ const setupNode = async ({node, serviceId, coords}) => {
               if(newPeerConnection.iceConnectionState === "connected"){
                 console.log("waves pc connected ", wavePeerId);
                 // 연결된 경우 flows에서 시청자 정보를 업데이트하고,
-                (!flows[peerId].waves) && (flows[peerId].waves = {});
+                if(!flows[peerId].waves) flows[peerId].waves = {};
                 flows[peerId].waves[wavePeerId] = true;
                 // waves에서 해당 waves가 어떤 flow를 보고 있는지 업데이트 한다,
                 waves[wavePeerId].currentFlowPeerId = peerId;
@@ -290,7 +295,7 @@ const setupNode = async ({node, serviceId, coords}) => {
                     toId: node.peerInfo.id.toB58String()
                   });
                 }else if(flows[idStr].pc.iceConnectionState === "closed"){
-                  window.location.reload();
+                  isBrowser ? window.location.reload() : process.exit(1);
                 }
               };
               await flows[idStr].pc.setRemoteDescription(sdp);
@@ -355,7 +360,8 @@ const setupNode = async ({node, serviceId, coords}) => {
                   });
                 }
                 console.log("readyToCast ", connectedFlowPeerId);
-                document.getElementById("currentConnectedFlowPeerId").textContent = `current Flow PeerId : ${connectedFlowPeerId}`;
+                if(isBrowser)
+                  document.getElementById("currentConnectedFlowPeerId").textContent = `current Flow PeerId : ${connectedFlowPeerId}`;
               }
             }
 
@@ -402,7 +408,8 @@ const setupNode = async ({node, serviceId, coords}) => {
         connectedFlowPeerId = null;
         currentFlowAssignedTime = undefined;
         releasedTime = Date.now();
-        document.getElementById("currentConnectedFlowPeerId").textContent = "";
+        if(isBrowser)
+          document.getElementById("currentConnectedFlowPeerId").textContent = "";
       }
     }else if(disconnPeerId && waves[disconnPeerId]){
       //wave가 끊어진경우

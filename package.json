@@ -5,7 +5,8 @@
   "main": "index.html",
   "scripts": {
     "start": "parcel -p 4567 public/index.html",
-    "build": "parcel build --no-source-maps ./public/index.html --public-url ./"
+    "build": "parcel build --no-source-maps ./public/index.html --public-url ./",
+    "server": "node ./src/index.js"
   },
   "keywords": [],
   "author": "",
@@ -14,6 +15,7 @@
     "parcel": "^1.11.0"
   },
   "dependencies": {
+    "@babel/polyfill": "^7.2.5",
     "chance": "^1.0.18",
     "libp2p": "0.22.0",
     "libp2p-kad-dht": "^0.14.1",
@@ -26,6 +28,7 @@
     "pull-notify": "^0.1.1",
     "pull-pushable": "^2.2.0",
     "pull-stringify": "^2.0.0",
-    "pull-tap": "^1.1.1"
+    "pull-tap": "^1.1.1",
+    "wrtc": "^0.3.5"
   }
 }
