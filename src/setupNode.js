@@ -158,7 +158,7 @@ const setupNode = async ({node, serviceId, coords}) => {
                   topic: "updateWaves",
                   waves: flows[peerId].waves
                 });
-                Object.keys(flows[peerId].waves).forEach(key =>{
+                flows[peerId].waves && Object.keys(flows[peerId].waves).forEach(key =>{
                   waves[key].pushable.push({
                     topic: "updateWaves",
                     waves: flows[peerId].waves
@@ -175,7 +175,7 @@ const setupNode = async ({node, serviceId, coords}) => {
                 clearPc(newPeerConnection);
                 // waves[wavePeerId].pc = null;
                 // 단절된 경우 flows에서 시청자 정보를 삭제하고,
-                delete flows[waves[wavePeerId].currentFlowPeerId].waves[wavePeerId];
+                flows[waves[wavePeerId].currentFlowPeerId] && delete flows[waves[wavePeerId].currentFlowPeerId].waves[wavePeerId];
                 // waves에서 해당 waves가 보고 있는 정보를 삭제한다,
                 waves[wavePeerId].currentFlowPeerId = null;
                 // 이후 삭제된 피어정보를 flows/waves전원에게 전파한다.
@@ -188,7 +188,7 @@ const setupNode = async ({node, serviceId, coords}) => {
                   topic: 'removeRoute',
                   peerId: wavePeerId
                 });
-                Object.keys(flows[peerId].waves).forEach(key =>{
+                flows[peerId].waves && Object.keys(flows[peerId].waves).forEach(key =>{
                   waves[key].pushable.push({
                     topic: "updateWaves",
                     waves: flows[peerId].waves
@@ -413,7 +413,7 @@ const setupNode = async ({node, serviceId, coords}) => {
       }
     }else if(disconnPeerId && waves[disconnPeerId]){
       //wave가 끊어진경우
-      delete flows[waves[disconnPeerId].currentFlowPeerId].waves[disconnPeerId];
+      flows[waves[disconnPeerId].currentFlowPeerId] &&delete flows[waves[disconnPeerId].currentFlowPeerId].waves[disconnPeerId];
       //waves[wavePeerId].pc 에 대해서 tranceiver inactivate 처리
       //waves[wavePeerId].pc.getTransceivers().forEach(transceiver => transceiver.direction = 'inactive');
       waves[wavePeerId].pc.close();
@@ -424,7 +424,7 @@ const setupNode = async ({node, serviceId, coords}) => {
         topic: "updateWaves",
         waves: flows[peerId].waves
       });
-      Object.keys(flows[peerId].waves).forEach(key =>{
+      flows[peerId].waves && Object.keys(flows[peerId].waves).forEach(key =>{
         waves[key].pushable.push({
           topic: "updateWaves",
           waves: flows[peerId].waves
