@@ -2,7 +2,7 @@
 const isBrowser = typeof window !== 'undefined';
 isBrowser && require('@babel/polyfill');
 let https;
-if(isBrowser){
+if(!isBrowser){
   https = require("https");
 }
 const createNode = require("./create-node");
