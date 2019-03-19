@@ -68,3 +68,6 @@ dist/
 # editor's configuration
 .idea
 .vscode
+
+release/
+package-lock.json

@@ -1,3 +1,5 @@
+/*jshint esversion: 6 */
+
 const isBrowser = typeof window !== 'undefined';
 
 const pull = require('pull-stream')
@@ -132,7 +134,7 @@ const setupNode = async ({node, serviceId, coords}) => {
       pull.drain(event => {
         const events = {
           'requestCreateOffer':async ({peerId})=>{
-            if(waves[wavePeerId].pc){
+            if (waves[wavePeerId].pc) {
               console.log("a previous Pc exists.");
               let closedPc = waves[wavePeerId].pc;
               clearPc(closedPc);

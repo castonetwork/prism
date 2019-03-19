@@ -6,13 +6,18 @@
   "scripts": {
     "start": "parcel -p 4567 public/index.html",
     "build": "parcel build --no-source-maps ./public/index.html --public-url ./",
-    "server": "node ./src/index.js"
+    "server": "node ./src/index.js",
+    "pkg": "npx pkg ./src/index.js"
+  },
+  "bin": {
+    "app": "./src"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "parcel": "^1.11.0"
+    "parcel": "^1.11.0",
+    "pkg": "^4.3.7"
   },
   "dependencies": {
     "@babel/polyfill": "^7.2.5",
