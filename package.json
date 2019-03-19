@@ -7,10 +7,14 @@
     "start": "parcel -p 4567 public/index.html",
     "build": "parcel build --no-source-maps ./public/index.html --public-url ./",
     "server": "node ./src/index.js",
-    "pkg": "npx pkg ./src/index.js"
+    "pkg": "npx pkg package.json --out-path ./release; cp ./node_modules/wrtc/build/Release/wrtc.node ./release"
   },
-  "bin": {
-    "app": "./src"
+  "bin": "./src/index.js",
+  "pkg": {
+    "scripts": "src/**/*.js",
+    "assets": [
+      "node_modules/**/*"
+    ]
   },
   "keywords": [],
   "author": "",
